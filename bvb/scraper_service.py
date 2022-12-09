@@ -1,24 +1,33 @@
 import requests
+from requests import Response
+
 from bvb.share import Share
+from bvb.company import Company
 
 
 class ScraperService:
     # _TIMEZONE = pytz.timezone('Europe/Bucharest')
     _ALL_VALUES = ['', 'ALL']
 
-    def _get_url_response(self, url: str) -> str:
+    def _get_url_response(self, url: str, headers: dict = None) -> Response:
         """
         Returns the response of a GET request to the specified URL if it successful.
         :param url: the URL from that information must be retrieved
         :type url: str
+        :param headers: special header definition
+        :type headers: dict
         :return: the text content of the URL
-        :rtype: str
+        :rtype: requests.models.Response object
         :raises ValueError: in case the response is not valid (contains no text or the response code was not 200)
         """
-        response = requests.get(url)
+        response = ""
+        if headers is None:
+            response = requests.get(url)
+        else:
+            response = requests.get(url, headers=headers)
         if response.status_code != 200 and response.text == '':
             raise ValueError("Response is not valid.")
-        return response.text
+        return response
 
     def _standardize_list_parameter(self, possible_values: list, value: str or list):
         """
@@ -124,7 +133,7 @@ class ScraperService:
         _FILTERS['tier'] = [_TIERS[t] for t in tier_filter_values]
 
         # scrape BVB and process the returned csv
-        response = self._get_url_response(_URL)  # returns a csv that has \r\n line endings and ; separator
+        response = self._get_url_response(_URL).text  # returns a csv that has \r\n line endings and ; separator
         response_lines = response.split("\r\n")  # the first row will be the header and the last one will be ''
         headers = [column.upper() for column in response_lines[0].split(";")]
 
@@ -198,3 +207,14 @@ class ScraperService:
             |   - 'MTS_INTL': => Intl MTS
         """
         return self.__get_shares(market=market, tier=tier)
+
+    def get_share_info(self, share: Share):
+        _URL = "https://wapi.bvb.ro/api/symbols?symbol=" + share.symbol
+        _REQUEST_HEADERS = {'Referer': 'https://www.bvb.ro/'}
+        data = self._get_url_response(_URL, _REQUEST_HEADERS).json() # api returns a json
+
+        # data["description"] = company name
+        company = Company(name=data["description"], sector=data["sector"], industry=data["industry"])
+        share.company = company
+
+        return share
