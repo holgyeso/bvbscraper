@@ -1,0 +1,7 @@
+Symbol;Security name;ISIN;Issuer;Fiscal / Unique Code;Shares;Face value;CAEN Code;District;Country;Exchange segment;Main Market;Tier;Status;Trading Model Type;Price steps list
+AAG;AAGES S.A.;ROAAGEACNOR7;S.C AAGES S.A.;1196550;10000000;0.2000;2711;MURES;RO;BSE;REGS;Standard;Tradeable;Continuous trading;shareM1
+
+ABS;
+MABE;MARTENS SA GALATI;ROMABEACNOR3;MARTENS SA GALATI;1627270;13222899;2.5000;1105;GALATI;RO;ATS;XRS1;AeRO Standard;Tradeable;Continuous trading;shareM1
+ABC;AAGES S.A.;ROAAGEACNOR7;S.C AAGES S.A.;1196550;10000000;0.2000;2711;MURES;RO;BSE;REGS;Premium;Tradeable;Continuous trading;shareM1
+
