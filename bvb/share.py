@@ -1,9 +1,11 @@
+import bvb.company
 from bvb.base import BaseEntity
 import re
 
+
 class Share(BaseEntity):
     __symbol = None
-    __info = {}
+    __specs = {}  #
 
     def __init__(self, symbol: str, params: dict = None, **kwargs):
         super().__init__()
@@ -12,10 +14,11 @@ class Share(BaseEntity):
             # order of merge is important, since explicitly given parameters will be considered in case the params and
             # kwargs both contain the same key
             kwargs = params | kwargs
-        self.__info['isin'] = kwargs.get("isin")
-        self.__info['market'] = kwargs.get("market")
-        self.__info['company'] = kwargs.get("company")
-        self.__info['tier'] = kwargs.get("tier")
+        self.__isin = kwargs.get("isin")
+        self.__market = kwargs.get("market")
+        self.__company = kwargs.get("company")
+        self.__tier = kwargs.get("tier")
+
     @property
     def symbol(self):
         return self.__symbol
@@ -34,35 +37,59 @@ class Share(BaseEntity):
 
     @property
     def info(self):
-        return self.__info
+        return {'symbol': self.symbol,
+                'isin': self.isin,
+                'company': self.company,
+                'market': self.market,
+                'tier': self.tier}
 
     @info.setter
     def info(self, info_dict):
-        self.__info = info_dict
+        if 'symbol' in info_dict:
+            self.symbol = info_dict['symbol']
+        if 'isin' in info_dict:
+            self.isin = info_dict['isin']
+        if 'company' in info_dict:
+            self.company = info_dict['company']
+        if 'market' in info_dict:
+            self.market = info_dict['market']
+        if 'tier' in info_dict:
+            self.tier = info_dict['tier']
 
     @property
     def company(self):
-        if 'company' in self.__info:
-            return self.__info['company']
-        else:
-            return None
+        return self.__company
 
     @company.setter
     def company(self, company):
-        self.__info['company'] = company
-    # @property
-    # def company(self):
-    #     return self.__info['company']
-    #
-    # @company.setter
-    # def company(self, company: str):
-    #     if company != '':
-    #         if type(company) != str:
-    #             raise TypeError("Company should be of type str.")
-    #         self.__info['company'] = company
-    #     else:
-    #         raise ValueError("Company should have a value.")
+        if isinstance(company, bvb.company.Company):
+            self.__company = company
+        else:
+            raise TypeError("company attribute must be of type bvb.company.Company class")
 
+    @property
+    def isin(self):
+        return self.__isin
+
+    @isin.setter
+    def isin(self, isin):
+        self.__isin = isin
+
+    @property
+    def market(self):
+        return self.__market
+
+    @market.setter
+    def market(self, market):
+        self.__market
+
+    @property
+    def tier(self):
+        return self.__tier
+
+    @tier.setter
+    def tier(self, tier):
+        self.__tier = tier
     def __repr__(self):
         return f"BVBScraper.Share object <{self.symbol}>"
 
