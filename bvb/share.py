@@ -65,7 +65,7 @@ class Share(BaseEntity):
         if isinstance(company, bvb.company.Company):
             self.__company = company
         else:
-            raise TypeError("company attribute must be of type bvb.company.Company class")
+            raise TypeError("Company attribute must be of type bvb.company.Company class")
 
     @property
     def isin(self):
@@ -73,7 +73,14 @@ class Share(BaseEntity):
 
     @isin.setter
     def isin(self, isin):
-        self.__isin = isin
+        isin_pattern = "^[A-Z]{2}[A-Z0-9]{9}[0-9]{1}$"
+        if type(isin) == str:
+            if re.findall(isin_pattern, isin):
+                self.__isin = isin
+            else:
+                raise ValueError("Invalid ISIN code.")
+        else:
+            raise TypeError("ISIN must be of type str.")
 
     @property
     def market(self):
@@ -81,7 +88,10 @@ class Share(BaseEntity):
 
     @market.setter
     def market(self, market):
-        self.__market
+        if market in ['REGS', 'XRS1', 'XRSI']:
+            self.__market = market
+        else:
+            raise ValueError("Invalid market abbreviation.")
 
     @property
     def tier(self):
@@ -89,7 +99,12 @@ class Share(BaseEntity):
 
     @tier.setter
     def tier(self, tier):
-        self.__tier = tier
+        valid_tiers = ["INT'L", "PREMIUM", "STANDARD", "AERO PREMIUM", "AERO STANDARD", "AERO BASE", "INTL-MTS"]
+        if tier in valid_tiers:
+            self.__tier = tier
+        else:
+            raise ValueError("Invalid tier abbreviation.")
+
     def __repr__(self):
         return f"BVBScraper.Share object <{self.symbol}>"
 
