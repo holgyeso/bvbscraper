@@ -20,11 +20,9 @@ class ScraperService:
         :rtype: requests.models.Response object
         :raises ValueError: in case the response is not valid (contains no text or the response code was not 200)
         """
-        response = ""
-        if headers is None:
-            response = requests.get(url)
-        else:
-            response = requests.get(url, headers=headers)
+
+        response = requests.get(url, headers=headers)
+
         if response.status_code != 200 and response.text == '':
             raise ValueError("Response is not valid.")
         return response
@@ -62,13 +60,12 @@ class ScraperService:
                     return [value]
                 else:
                     raise ValueError("The provided '" + value + "' abbreviation is not valid.")
-
         # if the value is a list and contains valid elements, return value with uppercase, else raise error
         elif type(value) == list:
             for v in value:
-                if v not in possible_values:
+                if v.upper() not in possible_values:
                     raise ValueError("The provided '" + v + "' abbreviation is not valid.")
-            return value
+            return [v.upper() for v in value]
         # if it was not a str nor a list, raise error
         else:
             raise TypeError("Market parameter must be a str or list.")

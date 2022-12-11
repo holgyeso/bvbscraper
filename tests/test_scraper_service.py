@@ -29,7 +29,7 @@ class TestScraperService(TestCase):
         )
         # test value given as str -> valid value with lower case
         self.assertListEqual(
-            ScraperService()._standardize_list_parameter(possible_values=['REGS', 'AERO', 'MTS'], value='mts'),
+            ScraperService()._standardize_list_parameter(possible_values=['REGS', 'AERO', 'MTS'], value=['mts']),
             ['MTS']
         )
         # test value given as str -> invalid value
