@@ -1,3 +1,5 @@
+import re
+
 from bvb.share import Share
 from bvb.company import Company
 from bvb.utils import share_utils as utils
@@ -51,7 +53,27 @@ class ScraperService:
         else:
             raise TypeError("Market parameter must be a str or list.")
 
-    def __get_shares(self, market: str or list = 'all', tier: str or list = 'all'):
+    def __get_symbol_info_wapi(self, share: Share):
+        """
+        Calls the symbol wapi of BVB and scrapes the industry and sector company attributes
+        :param share: a Share object for that information will be retrieved
+        :type: bvb.share.Share
+        :return: a new Share object that has sector and industry information added
+        """
+        _URL = "https://wapi.bvb.ro/api/symbols?symbol=" + share.symbol
+        _REQUEST_HEADERS = {'Referer': 'https://www.bvb.ro/'}
+        data = utils.get_url_response(_URL, _REQUEST_HEADERS).json()  # api returns a json
+
+        # data regarding company -> industry and sector
+        share.company.sector = data["sector"]
+        share.company.industry = data["industry"]
+
+        # TODO: explore if anything else is needed from this dict
+
+        return share
+
+    def __get_shares_from_share_list(self, market: str or list = 'all', tier: str or list = 'all',
+                                     symbol: str or list = 'all'):
         """
         Gets all shares from BVB that are traded in the specified market and tier with some general info
         :param market: the abbreviation of a BVB market or '' or 'all' representing all markets.
@@ -79,21 +101,22 @@ class ScraperService:
         _URL = "https://www.bvb.ro/FinancialInstruments/Markets/SharesListForDownload.ashx"
 
         _NEEDED_COLUMNS = {  # info that will be returned about a share
-                           'symbol': 'SYMBOL',
-                           'isin': 'ISIN',
-                           'name': 'SECURITY NAME',  # it is not necessarily the issuer's name
-                           'total_shares': 'SHARES',
-                           'face_value': 'FACE VALUE',
+            'symbol': 'SYMBOL',
+            'isin': 'ISIN',
+            'name': 'SECURITY NAME',  # it is not necessarily the issuer's name
+            'total_shares': 'SHARES',
+            'face_value': 'FACE VALUE',
         }
         _COMPANY_COLUMNS = {  # info about the company that will be converted into a company object referenced in share
-                        'name': 'ISSUER',
-                        'fiscal_code': 'FISCAL / UNIQUE CODE',
-                        'nace_code': 'CAEN CODE',
-                        'district': 'DISTRICT',
-                        'country_iso2': 'COUNTRY'
+            'name': 'ISSUER',
+            'fiscal_code': 'FISCAL / UNIQUE CODE',
+            'nace_code': 'CAEN CODE',
+            'district': 'DISTRICT',
+            'country_iso2': 'COUNTRY'
 
         }
-        _FILTER_COLUMNS = {'tier': 'TIER', 'market': 'MAIN MARKET'}  # columns by those data rows will be filtered
+        _FILTER_COLUMNS = {'symbol': 'SYMBOL', 'tier': 'TIER',
+                           'market': 'MAIN MARKET'}  # columns by those data rows will be filtered
 
         # market and tier parameter mapping dicts {param_value: scraped_value}
         _MARKETS = {
@@ -114,9 +137,23 @@ class ScraperService:
 
         # construct the filter dict that contains the possible values of each filter column
         _FILTERS = {
+            'symbol': [],  # will be removed if all symbols must be downloaded
             'market': [],
             'tier': []
         }
+
+        if type(symbol) == str:
+            if symbol.upper() != 'ALL':
+                symbol = [symbol]
+
+        if type(symbol) == list:
+            for sy in symbol:
+                if type(sy) == str:
+                    if re.findall("^[a-zA-Z0-9]+$", sy):
+                        _FILTERS['symbol'].append(sy.upper())
+
+        if not _FILTERS['symbol']:
+            del _FILTERS['symbol']
 
         market_filter_values = self._standardize_list_parameter(possible_values=list(_MARKETS), value=market)
         _FILTERS['market'] = [_MARKETS[m] for m in market_filter_values]
@@ -181,7 +218,7 @@ class ScraperService:
                         except IndexError:
                             company_dict[col] = None
 
-                    co_name= company_dict['name']
+                    co_name = company_dict['name']
                     co_fiscal_code = company_dict['fiscal_code']
                     company = Company(name=co_name, fiscal_code=co_fiscal_code, params=company_dict)
 
@@ -192,7 +229,82 @@ class ScraperService:
 
         return return_values
 
-    def get_shares(self, market='all', tier='all'):
+    def __get_share_info(self, symbol: str or list = 'all'):
+        shares = self.__get_shares_from_share_list(market='all', tier='all', symbol=symbol)
+        for share in shares:
+            share = self.__get_symbol_info_wapi(share=share)
+        return shares
+
+    def __get_detailed_company_info(self, share: Share):
+        _BASE_URL = "https://www.bvb.ro/FinancialInstruments/Details/FinancialInstrumentsDetails.aspx?s="
+        _COMPANY_INFO_BUTTON = "Issuer profile"
+
+
+        html = utils.post_response_aspx_form(
+            url=_BASE_URL + share.symbol,
+            button=_COMPANY_INFO_BUTTON,
+            form_id="aspnetForm"
+        )
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        company_info = {}
+
+        # issuer profile
+        profile_table = soup.find("table", {"id": "ctl00_body_ctl02_CompanyProfile_dvIssProfile"})
+
+        _NEEDED_PROFILE_INFO = {
+            'Commerce Registry Code': 'commerce_registry_code',
+            'Address': 'address',
+            'Website': 'website',
+            'E-mail': 'email',
+            'Field of activity': 'activity_field'
+        }
+
+        for tr in profile_table.find_all('tr'):
+            tds = tr.find_all('td')
+            if len(tds) != 2:
+                raise ValueError("A tr element does not have exactly two td elements in company profile")
+
+            key = tds[0].text
+            if key in _NEEDED_PROFILE_INFO:
+                if key == "Website":
+                    val = tds[1].find("a")['href']
+                else:
+                    val = tds[1].text.replace("\r\n", "").strip()
+                company_info[_NEEDED_PROFILE_INFO[key]] = val
+
+        # issuer description
+        description_div = soup.find("div", {"id": "ctl00_body_ctl02_CompanyProfile_CDescription"})
+        if description_div:
+            description_span = description_div.find_all("span", {"lang": "EN-US"})
+            desc_text = ""
+            for span in description_span:
+                desc_text += span.text
+
+            company_info["description"] = desc_text
+
+        # shareholders
+        shareholders = soup.find("table", {"id": "gvDetails"})
+        if shareholders:
+            shareholder_list = []
+            trs = shareholders.find_all("tr")
+            headers = [th.text for th in trs[0].find_all("th")]
+            for tr in trs[1:-1]:
+                shareholder_dict = {}
+                tds = tr.find_all("td")
+                for h in range(0, len(headers)):
+                    shareholder_dict[headers[h]] = tds[h].text
+                shareholder_list.append(shareholder_dict)
+
+            company_info["shareholders"] = shareholder_list
+
+        for i in company_info:
+            share.company.__setattr__(i, company_info[i])
+
+        return share
+
+    def get_shares(self, market: str or list = 'all', tier: str or list = 'all'):
         """
         Gets all shares from BVB that are traded in the specified market and tier
         :param market: the abbreviation of a BVB market or '' or 'all' representing all markets.
@@ -214,44 +326,34 @@ class ScraperService:
             |   - 'AERO_BASE': => AeRO Base
             |   - 'MTS_INTL': => Intl MTS
         """
-        return self.__get_shares(market=market, tier=tier)
+        shares = self.__get_shares_from_share_list(market=market, tier=tier)
+        for share in shares:
+            share = self.__get_symbol_info_wapi(share=share)
+        return shares
 
-    # def get_share_info(self, share: Share):
-    #     _URL = "https://wapi.bvb.ro/api/symbols?symbol=" + share.symbol
-    #     _REQUEST_HEADERS = {'Referer': 'https://www.bvb.ro/'}
-    #     data = utils.get_url_response(_URL, _REQUEST_HEADERS).json()  # api returns a json
-    #
-    #     # data["description"] = company name
-    #     company = Company(name=data["description"], sector=data["sector"], industry=data["industry"])
-    #     share.company = company
-    #
-    #     return share
-    #
-    # def get_detailed_company_info(self, share: Share = None, symbol: str = None):
-    #     _BASE_URL = "https://www.bvb.ro/FinancialInstruments/Details/FinancialInstrumentsDetails.aspx?s="
-    #     _COMPANY_INFO_BUTTON = "Issuer profile"
-    #
-    #     if share is None and symbol is None:
-    #         raise ValueError("One of share and symbol parameters must be given.")
-    #
-    #     if Share is not None:
-    #         if not isinstance(share, Share):
-    #             raise TypeError("The provided share is not of type bvbscraper.bvb.Share.")
-    #     else:
-    #         if type(symbol) == str:
-    #             share = Share(symbol=symbol)
-    #         else:
-    #             raise TypeError("Symbol is not of type str.")
-    #
-    #     html = utils.post_response_aspx_form(
-    #         url=_BASE_URL + share.symbol,
-    #         button=_COMPANY_INFO_BUTTON,
-    #         form_id="aspnetForm"
-    #     )
-    #
-    #     soup = BeautifulSoup(html, 'html.parser')
-    #
-    #     return soup.find(id="ctl00_body_ctl02_CompanyProfile_dvIssProfile")
+    def get_share_info(self, symbol: str or list = 'all'):
+        return self.__get_share_info(symbol=symbol)
 
+    def get_all_share_info(self, share: Share or list = None, symbol: str or list = None):
+        if share is None and symbol is None:
+            raise ValueError("One of share and symbol parameters must be given.")
 
+        if share is not None:
+            if type(share) == str:
+                share = [share]
 
+            if type(share) == list:
+                for sh in share:
+                    if not isinstance(sh, Share):
+                        raise TypeError(f"The provided {sh} share is not of type bvbscraper.bvb.Share.")
+        else:
+            if type(symbol) == str:
+                symbol = [symbol]
+
+            if type(symbol) == list:
+                share = self.get_share_info(symbol=symbol)
+
+        for sh in share:
+            sh = self.__get_detailed_company_info(share=sh)
+
+        return share

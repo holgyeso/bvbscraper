@@ -1,4 +1,5 @@
 import re
+from typing import Any
 
 from bvb.base import BaseEntity
 
@@ -17,6 +18,13 @@ class Company(BaseEntity):
         self.country_iso2 = kwargs.get("country_iso2")
         self.sector = kwargs.get("sector")
         self.industry = kwargs.get("industry")
+        self.commerce_registry_code = kwargs.get("commerce_registry_code")
+        self.address = kwargs.get("address")
+        self.website = kwargs.get("website")
+        self.email = kwargs.get("email")
+        self.activity_field = kwargs.get("activity_field")
+        self.description = kwargs.get("description")
+        self.shareholders = kwargs.get("shareholders")
 
     @property
     def name(self):
@@ -30,6 +38,7 @@ class Company(BaseEntity):
             self.__name = name
         else:
             raise ValueError("Company name must be given.")
+
     @property
     def fiscal_code(self):
         return self.__fiscal_code
@@ -94,35 +103,150 @@ class Company(BaseEntity):
 
     @property
     def sector(self):
-        if '_Company__sector' not in vars(self):
+        if '_Company__sector' in vars(self):
             return self.__sector
-        return  None
+        return None
 
     @sector.setter
     def sector(self, sector):
-        self.__sector = sector
+        if sector:
+            if type(sector) != str:
+                raise TypeError("Sector must be of type string")
+            self.__sector = sector.upper()
 
     @property
     def industry(self):
-        if '_Company__industry' not in vars(self):
+        if '_Company__industry' in vars(self):
             return self.__industry
         return None
 
     @industry.setter
     def industry(self, industry):
-        self.__industry = industry
+        if industry:
+            if type(industry) != str:
+                raise TypeError("Industry must be of type string")
+            self.__industry = industry.upper()
+
+    @property
+    def commerce_registry_code(self):
+        if '_Company__commerce_registry_code' in vars(self):
+            return self.__commerce_registry_code
+        return None
+
+    @commerce_registry_code.setter
+    def commerce_registry_code(self, reg_code):
+        if reg_code:
+            if type(reg_code) != str:
+                raise TypeError("Commerce Registry Code must be of type str")
+
+            reg_code = reg_code.upper()
+
+            if re.findall(r"^[JCF][0-9]{2}/[0-9]+/[0-9]{4}", reg_code):
+                self.__commerce_registry_code = reg_code
+
+    @property
+    def address(self):
+        if '_Company__address' in vars(self):
+            return self.__address
+        return None
+
+    @address.setter
+    def address(self, address):
+        if address:
+            if type(address) != str:
+                raise TypeError("Address must be of type str")
+            self.__address = address
+
+    @property
+    def website(self):
+        if '_Company__website' in vars(self):
+            return self.__website
+        return None
+
+    @website.setter
+    def website(self, website):
+        if website:
+            if type(website) != str:
+                raise TypeError("Website must be of type str")
+
+            self.__website = website
+
+    @property
+    def email(self):
+        if '_Company__email' in vars(self):
+            return self.__email
+        return None
+
+    @email.setter
+    def email(self, email):
+        if email:
+            if type(email) != str:
+                raise TypeError("Email must be of type str")
+            if re.findall(r"^(.+@.+\..+)+", email):
+                self.__email = email
+
+    @property
+    def activity_field(self):
+        if '_Company__activity_field' in vars(self):
+            return self.__activity_field
+        return None
+
+    @activity_field.setter
+    def activity_field(self, activity):
+        if activity:
+            if type(activity) != str:
+                raise TypeError("Field of activity must be of type str")
+            self.__activity_field = activity.upper()
+
+    @property
+    def description(self):
+        if '_Company__description' in vars(self):
+            return self.__description
+        return None
+
+    @description.setter
+    def description(self, desc):
+        if desc:
+            if type(desc) != str:
+                raise TypeError("Description must be of type str")
+            self.__description = desc
+
+    @property
+    def shareholders(self):
+        if '_Company__shareholders' in vars(self):
+            return self.__shareholders
+        return None
+
+    @shareholders.setter
+    def shareholders(self, shareholders):
+        if shareholders:
+            if type(shareholders) != list:
+                raise TypeError("Type of shareholders is defined to be list")
+            self.__shareholders = shareholders
 
     @property
     def info(self):
         return {
             "company_name": self.name,
             "fiscal_code": self.fiscal_code,
-            "nace_code": self.nace_code,
+            "commerce_registry_code": self.commerce_registry_code,
+            "headquarters": self.address,
             "district": self.district,
             "country_iso2": self.country_iso2,
+            "nace_code": self.nace_code,
             "sector": self.sector,
-            "industry": self.industry
+            "industry": self.industry,
+            "activity_field": self.activity_field,
+            "description": self.description,
+            "website": self.website,
+            "email": self.email,
+            "shareholders": self.shareholders
         }
 
     def __repr__(self):
         return f"BVBScraper.Company object <name={self.__name}>"
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        super().__setattr__(name, value)
+
+
