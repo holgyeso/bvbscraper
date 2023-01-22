@@ -1,31 +1,12 @@
-import requests
-from requests import Response
-
 from bvb.share import Share
 from bvb.company import Company
+from bvb.utils import share_utils as utils
+from bs4 import BeautifulSoup
 
 
 class ScraperService:
     # _TIMEZONE = pytz.timezone('Europe/Bucharest')
     _ALL_VALUES = ['', 'ALL']
-
-    def _get_url_response(self, url: str, headers: dict = None) -> Response:
-        """
-        Returns the response of a GET request to the specified URL if it successful.
-        :param url: the URL from that information must be retrieved
-        :type url: str
-        :param headers: special header definition
-        :type headers: dict
-        :return: the text content of the URL
-        :rtype: requests.models.Response object
-        :raises ValueError: in case the response is not valid (contains no text or the response code was not 200)
-        """
-
-        response = requests.get(url, headers=headers)
-
-        if response.status_code != 200 and response.text == '':
-            raise ValueError("Response is not valid.")
-        return response
 
     def _standardize_list_parameter(self, possible_values: list, value: str or list):
         """
@@ -72,7 +53,7 @@ class ScraperService:
 
     def __get_shares(self, market: str or list = 'all', tier: str or list = 'all'):
         """
-        Gets all shares from BVB that are traded in the specified market and tier
+        Gets all shares from BVB that are traded in the specified market and tier with some general info
         :param market: the abbreviation of a BVB market or '' or 'all' representing all markets.
         :type: str or list
         :param tier: the abbreviation of a BVB market tier or '' or 'all' representing all market tiers.
@@ -97,7 +78,21 @@ class ScraperService:
         """
         _URL = "https://www.bvb.ro/FinancialInstruments/Markets/SharesListForDownload.ashx"
 
-        _NEEDED_COLUMNS = {'symbol': 'SYMBOL', 'isin': 'ISIN'}  # info that will be returned about a share
+        _NEEDED_COLUMNS = {  # info that will be returned about a share
+                           'symbol': 'SYMBOL',
+                           'isin': 'ISIN',
+                           'name': 'SECURITY NAME',  # it is not necessarily the issuer's name
+                           'total_shares': 'SHARES',
+                           'face_value': 'FACE VALUE',
+        }
+        _COMPANY_COLUMNS = {  # info about the company that will be converted into a company object referenced in share
+                        'name': 'ISSUER',
+                        'fiscal_code': 'FISCAL / UNIQUE CODE',
+                        'nace_code': 'CAEN CODE',
+                        'district': 'DISTRICT',
+                        'country_iso2': 'COUNTRY'
+
+        }
         _FILTER_COLUMNS = {'tier': 'TIER', 'market': 'MAIN MARKET'}  # columns by those data rows will be filtered
 
         # market and tier parameter mapping dicts {param_value: scraped_value}
@@ -130,7 +125,7 @@ class ScraperService:
         _FILTERS['tier'] = [_TIERS[t] for t in tier_filter_values]
 
         # scrape BVB and process the returned csv
-        response = self._get_url_response(_URL).text  # returns a csv that has \r\n line endings and ; separator
+        response = utils.get_url_response(_URL).text  # returns a csv that has \r\n line endings and ; separator
         response_lines = response.split("\r\n")  # the first row will be the header and the last one will be ''
         headers = [column.upper() for column in response_lines[0].split(";")]
 
@@ -138,6 +133,7 @@ class ScraperService:
         # there will be no need to iterate through the header columns and each row column and check if the header
         # is in _NEEDED_COLUMNS, get its index and based on this get the value from the row.
         _NEEDED_COLUMNS_INDEX = {n: headers.index(_NEEDED_COLUMNS[n]) for n in _NEEDED_COLUMNS}
+        _COMPANY_COLUMNS_INDEX = {c: headers.index(_COMPANY_COLUMNS[c]) for c in _COMPANY_COLUMNS}
         _FILTER_COLUMNS_INDEX = {f: headers.index(_FILTER_COLUMNS[f]) for f in _FILTER_COLUMNS}
 
         # first each row in response_lines should be split by ';' then, all filters should be checked, and
@@ -167,15 +163,30 @@ class ScraperService:
                     share_init_dict = {}
 
                     for col in _NEEDED_COLUMNS:
-                        col_index = _NEEDED_COLUMNS_INDEX[col]
-                        if col_index < len(data_row):
-                            share_init_dict[col] = data_row[col_index]
+                        try:
+                            share_init_dict[col] = data_row[_NEEDED_COLUMNS_INDEX[col]]
+                        except IndexError:
+                            share_init_dict[col] = None
 
                     for col in _FILTER_COLUMNS:
-                        share_init_dict[col] = data_row[_FILTER_COLUMNS_INDEX[col]]
+                        try:
+                            share_init_dict[col] = data_row[_FILTER_COLUMNS_INDEX[col]]
+                        except IndexError:
+                            share_init_dict[col] = None
 
+                    company_dict = {}
+                    for col in _COMPANY_COLUMNS:
+                        try:
+                            company_dict[col] = data_row[_COMPANY_COLUMNS_INDEX[col]]
+                        except IndexError:
+                            company_dict[col] = None
+
+                    co_name= company_dict['name']
+                    co_fiscal_code = company_dict['fiscal_code']
+                    company = Company(name=co_name, fiscal_code=co_fiscal_code, params=company_dict)
+
+                    share_init_dict['company'] = company
                     share_symbol = share_init_dict['symbol']
-                    # del share_init_dict['symbol']
 
                     return_values.append(Share(symbol=share_symbol, params=share_init_dict))
 
@@ -205,13 +216,42 @@ class ScraperService:
         """
         return self.__get_shares(market=market, tier=tier)
 
-    def get_share_info(self, share: Share):
-        _URL = "https://wapi.bvb.ro/api/symbols?symbol=" + share.symbol
-        _REQUEST_HEADERS = {'Referer': 'https://www.bvb.ro/'}
-        data = self._get_url_response(_URL, _REQUEST_HEADERS).json() # api returns a json
+    # def get_share_info(self, share: Share):
+    #     _URL = "https://wapi.bvb.ro/api/symbols?symbol=" + share.symbol
+    #     _REQUEST_HEADERS = {'Referer': 'https://www.bvb.ro/'}
+    #     data = utils.get_url_response(_URL, _REQUEST_HEADERS).json()  # api returns a json
+    #
+    #     # data["description"] = company name
+    #     company = Company(name=data["description"], sector=data["sector"], industry=data["industry"])
+    #     share.company = company
+    #
+    #     return share
+    #
+    # def get_detailed_company_info(self, share: Share = None, symbol: str = None):
+    #     _BASE_URL = "https://www.bvb.ro/FinancialInstruments/Details/FinancialInstrumentsDetails.aspx?s="
+    #     _COMPANY_INFO_BUTTON = "Issuer profile"
+    #
+    #     if share is None and symbol is None:
+    #         raise ValueError("One of share and symbol parameters must be given.")
+    #
+    #     if Share is not None:
+    #         if not isinstance(share, Share):
+    #             raise TypeError("The provided share is not of type bvbscraper.bvb.Share.")
+    #     else:
+    #         if type(symbol) == str:
+    #             share = Share(symbol=symbol)
+    #         else:
+    #             raise TypeError("Symbol is not of type str.")
+    #
+    #     html = utils.post_response_aspx_form(
+    #         url=_BASE_URL + share.symbol,
+    #         button=_COMPANY_INFO_BUTTON,
+    #         form_id="aspnetForm"
+    #     )
+    #
+    #     soup = BeautifulSoup(html, 'html.parser')
+    #
+    #     return soup.find(id="ctl00_body_ctl02_CompanyProfile_dvIssProfile")
 
-        # data["description"] = company name
-        company = Company(name=data["description"], sector=data["sector"], industry=data["industry"])
-        share.company = company
 
-        return share
+
