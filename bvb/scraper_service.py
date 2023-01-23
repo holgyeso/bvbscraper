@@ -1,15 +1,42 @@
-import re
-
 from bvb.share import Share
 from bvb.company import Company
 from bvb.utils import share_utils as utils
 from bs4 import BeautifulSoup
+import datetime
+import dateutil.relativedelta as relativedelta
+import re
 
 
 class ScraperService:
     # _TIMEZONE = pytz.timezone('Europe/Bucharest')
     _ALL_VALUES = ['', 'ALL']
+    _HISTORY_INTERVALS = {
+        "1MIN": {'dt': 'INTRA', 'p': 'intraday_1'},
+        "5MIN": {'dt': 'INTRA', 'p': 'intraday_5'},
+        "15MIN": {'dt': 'INTRA', 'p': 'intraday_15'},
+        "30MIN": {'dt': 'INTRA', 'p': 'intraday_30'},
+        "1H": {'dt': 'INTRA', 'p': 'intraday_60'},
+        "1D": {'dt': 'DAILY', 'p': 'day'},
+        "1W": {'dt': 'DAILY', 'p': 'week'},
+        "1M": {'dt': 'MONTH', 'p': 'month'}
+    }
+    _HISTORY_PERIODS = {
+        "1D": datetime.timedelta(days=1),
+        "5D": datetime.timedelta(days=5),
+        "1W": relativedelta.relativedelta(weeks=1),
+        "2W": relativedelta.relativedelta(weeks=2),
+        "1M": relativedelta.relativedelta(months=1),
+        "3M": relativedelta.relativedelta(months=3),
+        "6M": relativedelta.relativedelta(months=6),
+        "1Y": relativedelta.relativedelta(years=1),
+        "2Y": relativedelta.relativedelta(years=2),
+        "5Y": relativedelta.relativedelta(years=5),
+        "10Y": relativedelta.relativedelta(years=10),
+        "YTD": None,
+        "MAX": None}
+    _MIN_START_DATE = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 
+    # UTIL FUNCTIONS #
     def _standardize_list_parameter(self, possible_values: list, value: str or list):
         """
         The function normalizes the `value` parameter:
@@ -53,33 +80,34 @@ class ScraperService:
         else:
             raise TypeError("Market parameter must be a str or list.")
 
-    def __get_symbol_info_wapi(self, share: Share):
-        """
-        Calls the symbol wapi of BVB and scrapes the industry and sector company attributes
-        :param share: a Share object for that information will be retrieved
-        :type: bvb.share.Share
-        :return: a new Share object that has sector and industry information added
-        """
-        _URL = "https://wapi.bvb.ro/api/symbols?symbol=" + share.symbol
-        _REQUEST_HEADERS = {'Referer': 'https://www.bvb.ro/'}
-        data = utils.get_url_response(_URL, _REQUEST_HEADERS).json()  # api returns a json
-
-        # data regarding company -> industry and sector
-        share.company.sector = data["sector"]
-        share.company.industry = data["industry"]
-
-        # TODO: explore if anything else is needed from this dict
-
-        return share
-
+    # SCRAPING FUNCTIONS #
     def __get_shares_from_share_list(self, market: str or list = 'all', tier: str or list = 'all',
                                      symbol: str or list = 'all'):
         """
-        Gets all shares from BVB that are traded in the specified market and tier with some general info
-        :param market: the abbreviation of a BVB market or '' or 'all' representing all markets.
+        Gets all shares from BVB that are traded in the specified market and tier with some general info:
+            * symbol
+            * isin
+            * name
+            * total_shares
+            * face_value
+            * market
+            * tier
+            * company:
+                * name
+                * fiscal_code
+                * nace_code
+                * district
+                * country_iso2
+        If the symbol parameter is given, the symbol will act as a filter, so a Share object will be returned only
+        for those symbols that are valid (were in the scraped CSV from BVB).
+        :param market: the abbreviation of a BVB market or '' or 'all' representing all markets. Defaults to 'all'.
         :type: str or list
-        :param tier: the abbreviation of a BVB market tier or '' or 'all' representing all market tiers.
+        :param tier: abbreviation of a BVB market tier or '' or 'all' representing all market tiers. Defaults to 'all'.
+        :type: str or list
+        :param symbol: the symbols for that the above-mentioned information needs to be retrieved.
+        :type: str or list
         :return: an array that contains Share instances that match the market and tier criteria
+        :rtype: list of Share objects
 
         .. note::
         market abbreviations:
@@ -229,19 +257,47 @@ class ScraperService:
 
         return return_values
 
-    def __get_share_info(self, symbol: str or list = 'all'):
-        shares = self.__get_shares_from_share_list(market='all', tier='all', symbol=symbol)
-        for share in shares:
-            share = self.__get_symbol_info_wapi(share=share)
-        return shares
+    def __get_symbol_info_wapi(self, share: Share):
+        """
+        Calls the symbol wapi of BVB and scrapes the industry and sector company attributes.
+        :param share: a Share object for that information will be retrieved
+        :type: bvb.share.Share
+        :return: a new Share object that has sector and industry information added
+        :rtype: list of Share objects
+        """
+        _URL = "https://wapi.bvb.ro/api/symbols?symbol=" + share.symbol
+        _REQUEST_HEADERS = {'Referer': 'https://www.bvb.ro/'}
+        data = utils.get_url_response(_URL, _REQUEST_HEADERS).json()  # api returns a json
+
+        # data regarding company -> industry and sector
+        share.company.sector = data["sector"]
+        share.company.industry = data["industry"]
+
+        # TODO: explore if anything else is needed from this dict
+
+        return share
 
     def __get_detailed_company_info(self, share: Share):
-        _BASE_URL = "https://www.bvb.ro/FinancialInstruments/Details/FinancialInstrumentsDetails.aspx?s="
+        """
+        Gets the following information from the "Issuer profile" section of the page of a share on BVB.
+        The information will be inserted in the Share's company attribute of type bvb.company.Company.
+            * commerce_registry_code
+            * address
+            * website
+            * email
+            * activity field
+            * description
+            * shareholders
+        :param share: the share object that's company fields will be completed.
+        :type: bvb.share.Share
+        :return: the new Share object with the fields that were retrieved from BVB
+        :rtype: list of Shares.
+        """
+
         _COMPANY_INFO_BUTTON = "Issuer profile"
 
-
-        html = utils.post_response_aspx_form(
-            url=_BASE_URL + share.symbol,
+        html = utils.post_response_instrument_details_form(
+            symbol=share.symbol,
             button=_COMPANY_INFO_BUTTON,
             form_id="aspnetForm"
         )
@@ -304,9 +360,107 @@ class ScraperService:
 
         return share
 
-    def get_shares(self, market: str or list = 'all', tier: str or list = 'all'):
+    def __get_issue_info(self, share: Share):
+        """
+        Gets the following information from the "Overview" section of the page of a share on BVB:
+            * start_trading_day
+        :param share: the share object that's attributes will be completed.
+        :type: bvb.share.Share
+        :return: the new Share object with the fields that were retrieved from BVB
+        :rtype: list of Shares.
+        """
+        _COMPANY_INFO_BUTTON = "Overview"
+
+        html = utils.post_response_instrument_details_form(
+            symbol=share.symbol,
+            button=_COMPANY_INFO_BUTTON,
+            form_id="aspnetForm"
+        )
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        issue_info = soup.find("h2", string="Issue info").parent.find("table", {"id": "dvInfo"})
+
+        _NEEDED_INFO = {
+            # "Share Capital": "share_capital", #TODO: to be added if necessary at financials
+            "Start trading date": "start_trading_date"
+        }
+
+        share_info = {}
+
+        for tr in issue_info.find_all("tr"):
+            tds = tr.find_all("td")
+            key = tds[0].text
+            if key in _NEEDED_INFO:
+                share_info[_NEEDED_INFO[key]] = tds[1].text
+
+        for info in share_info:
+            share.__setattr__(info, share_info[info])
+
+        return share
+
+    # AGGREGATING SCRAPING FUNCTIONS #
+    def __get_general_share_info(self, symbol: str or list):
+        """
+        Initializes a share object for the symbol with the following information:
+            * symbol
+            * isin
+            * name
+            * total_shares
+            * face_value
+            * market
+            * tier
+            * company:
+                * name
+                * fiscal_code
+                * nace_code
+                * district
+                * country_iso2
+                * sector
+                * industry
+        Calls the __get_shares_from_share_list() and __get_symbol_info_wapi() scraping functions
+        :param symbol:
+        :type: str or list of strings
+        :return: list of Shares with the above information retrieved.
+        :rtype: list of Share objects
+        """
+        shares = self.__get_shares_from_share_list(market='all', tier='all', symbol=symbol)
+        for share in shares:
+            share = self.__get_symbol_info_wapi(share=share)
+
+        return shares
+
+    def __get_additional_info(self, shares: Share or list,
+                              detailed_company_info: bool = False, issue_info: bool = False):
+        """
+        Calls the specific functions on the provided shares objects
+        :param shares:
+        :type: Share or list of Share objects
+        :param detailed_company_info: True if detailed_company_info should be retrieved. Defaults to False.
+        :type: bool
+        :param issue_info: True if issue_info should be retrieved. Defaults to False.
+        :type: bool
+        :return: list of Shares object with completed information based on what parameters were set to be True.
+        :rtype: list of Share objects
+        """
+        if isinstance(shares, Share):
+            shares = [shares]
+
+        for share in shares:
+            if detailed_company_info:
+                share = self.__get_detailed_company_info(share=share)
+            if issue_info:
+                share = self.__get_issue_info(share=share)
+
+        return shares
+
+    # PUBLIC FUNCTIONS #
+    def get_all_shares(self, market: str or list = 'all', tier: str or list = 'all',
+                       detailed_company_info: bool = True, issue_info: bool = True,):
         """
         Gets all shares from BVB that are traded in the specified market and tier
+        :param issue_info:
+        :param detailed_company_info:
         :param market: the abbreviation of a BVB market or '' or 'all' representing all markets.
         :type: str or list
         :param tier: the abbreviation of a BVB market tier or '' or 'all' representing all market tiers.
@@ -327,18 +481,22 @@ class ScraperService:
             |   - 'MTS_INTL': => Intl MTS
         """
         shares = self.__get_shares_from_share_list(market=market, tier=tier)
+
         for share in shares:
             share = self.__get_symbol_info_wapi(share=share)
+
+        share = self.__get_additional_info(shares=shares, detailed_company_info=detailed_company_info,
+                                           issue_info=issue_info)
+
         return shares
 
-    def get_share_info(self, symbol: str or list = 'all'):
-        return self.__get_share_info(symbol=symbol)
-
-    def get_all_share_info(self, share: Share or list = None, symbol: str or list = None):
+    def get_share_info(self, symbol: str or list = None,
+                       detailed_company_info: bool = True, issue_info: bool = True,
+                       share: Share or list = None):
         if share is None and symbol is None:
             raise ValueError("One of share and symbol parameters must be given.")
 
-        if share is not None:
+        if share:
             if type(share) == str:
                 share = [share]
 
@@ -351,9 +509,120 @@ class ScraperService:
                 symbol = [symbol]
 
             if type(symbol) == list:
-                share = self.get_share_info(symbol=symbol)
+                share = self.__get_general_share_info(symbol=symbol)
 
-        for sh in share:
-            sh = self.__get_detailed_company_info(share=sh)
+        share = self.__get_additional_info(shares=share, detailed_company_info=detailed_company_info,
+                                           issue_info=issue_info)
+
+        if len(share) == 1:
+            return share[0]
 
         return share
+
+    def get_history(self, share: Share, period: str = None, start_date: datetime or str = None,
+                    end_date: datetime or str = None, interval: str = '1D',
+                    adjusted: bool = True):
+        """
+        Gets open, close, highest and lowest price and volume for the specific share.
+        Period or start_date and end_date must be provided.
+        If all three are provided, start date and end date
+        :param share: a Share object that's history should be downloaded
+        :type: bvb.share.Share
+        :param period: Valid periods:
+        :param start_date: download start date string (YYYY-MM-DD) or datetime.datetime object.
+        :param end_date: download end date string (YYYY-MM-DD), "now" or datetime.datetime object.
+        :param interval: frequency of data. Valid intervals: 1min, 5min, 15min, 30min, 1h, 1D, 1W, 1M. Defaults to 1 day (1D).
+        :param adjusted: True to return adjusted prices, False for unadjusted. Defaults True.
+        :return: pandas.DataFrame with date, open, close, high, low, volume columns. ##TODO: revise
+        """
+        if not isinstance(share, Share):
+            raise TypeError("Provided share is not type of Share.")
+
+        if period is None and start_date is None and end_date is None:
+            raise ValueError("Period or start and end date must be provided.")
+
+        if start_date and end_date:
+            if type(start_date) == str:
+                try:
+                    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+                except ValueError:
+                    raise ValueError("Start date cannot be converted to datetime.datetime: invalid str format.")
+
+            if type(start_date) != datetime.datetime:
+                raise TypeError("Start date not of type datetime.datetime.")
+
+            if start_date < self._MIN_START_DATE:
+                raise ValueError("Timestamp ranges between 1970 -> 2038")
+
+            if type(end_date) == str:
+                if end_date.upper() == "NOW":
+                    end_date = datetime.datetime.today()
+                else:
+                    try:
+                        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+                    except ValueError:
+                        raise ValueError("End date cannot be converted to datetime.datetime: invalid str format.")
+
+            if type(end_date) != datetime.datetime:
+                raise TypeError("End date is not of type datetime.datetime.")
+
+        else:
+            if type(period) != str:
+                raise TypeError("Period must be of type str.")
+
+            period = period.upper()
+
+            if period not in self._HISTORY_PERIODS:
+                raise ValueError("Invalid period.")
+
+            end_date = datetime.datetime.today()
+
+            if period == 'YTD':
+                start_date = end_date.replace(month=1, day=1)
+
+            elif period == 'MAX':
+                if share.start_trading_date:
+                    start_date = share.start_trading_date # FIXME: see if -1 is needed or not
+                else:
+                    start_date = self._MIN_START_DATE  # FIXME: see what the api does when min < min_trading_date
+
+            else:
+                start_date = end_date - self._HISTORY_PERIODS[period]
+
+        if interval.upper() not in self._HISTORY_INTERVALS:
+            raise ValueError(f"Invalid {interval} interval.")
+
+        if type(adjusted) != bool:
+            raise TypeError("Parameter adjusted must be of type bool.")
+
+
+        print("start date: ", start_date)
+        print("end date: ", end_date)
+
+        start_timestamp = int(datetime.datetime.timestamp(start_date)) # FIXME: int() is ok w 1m interval?
+        end_timestamp = int(datetime.datetime.timestamp(end_date))
+        dt = self._HISTORY_INTERVALS[interval]['dt']
+        p = self._HISTORY_INTERVALS[interval]['p']
+        if adjusted:
+            adjusted = 1
+        else:
+            adjusted = 0
+
+        print("headers", {"symbol": share.symbol,
+                          "dt": dt,
+                          "p": p,
+                          "ajust": adjusted,
+                          "from": start_timestamp,
+                          "end": end_timestamp})
+
+        url = f'https://wapi.bvb.ro/api/history?symbol={share.symbol}&' \
+                                               f'dt={dt}&' \
+                                               f'p={p}&' \
+                                               f'ajust={adjusted}&' \
+                                               f'from={start_timestamp}&' \
+                                               f'to={end_timestamp}'
+        headers = {"Referer": "https://bvb.ro/"}
+
+        resp = utils.get_url_response(url=url, headers=headers)
+
+        return resp.json()

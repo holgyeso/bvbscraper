@@ -1,3 +1,6 @@
+import datetime
+from typing import Any
+
 import bvb.company
 from bvb.base import BaseEntity
 import re
@@ -21,6 +24,7 @@ class Share(BaseEntity):
         self.face_value = kwargs.get("face_value")
         self.market = kwargs.get("market")
         self.tier = kwargs.get("tier")
+        self.start_trading_date = kwargs.get("start_trading_date")
 
     @property
     def symbol(self):
@@ -171,11 +175,35 @@ class Share(BaseEntity):
                     'face_value': self.face_value,
                     'market': self.market,
                     'tier': self.tier,
-                    'company': company
+                    'company': company,
+                    'start_trading_date': self.start_trading_date
                 }
+
+    @property
+    def start_trading_date(self):
+        if '_Share__start_trading_date' in vars(self):
+            return self.__start_trading_date
+        return None
+
+    @start_trading_date.setter
+    def start_trading_date(self, start_date):
+        if start_date:
+            if type(start_date) == str:
+                try:
+                    start_date = datetime.datetime.strptime(start_date, "%m/%d/%Y")
+                except ValueError:
+                    raise ValueError("Start date cannot be converted to datetime.datetime")
+
+            if type(start_date) == datetime.datetime:
+                self.__start_trading_date = start_date
 
     def __repr__(self):
         return f"BVBScraper.Share object <{self.symbol}>"
 
     def __eq__(self, other):
         return self.symbol == other.symbol
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        super().__setattr__(name, value)
+
+
