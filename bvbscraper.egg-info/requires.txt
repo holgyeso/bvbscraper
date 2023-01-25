@@ -1,0 +1,5 @@
+requests
+beautifulsoup4
+uuid
+python-dateutil
+pandas

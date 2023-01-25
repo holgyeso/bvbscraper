@@ -1,0 +1,15 @@
+README.md
+setup.py
+bvbscraper/__init__.py
+bvbscraper.egg-info/PKG-INFO
+bvbscraper.egg-info/SOURCES.txt
+bvbscraper.egg-info/dependency_links.txt
+bvbscraper.egg-info/requires.txt
+bvbscraper.egg-info/top_level.txt
+bvbscraper/bvb/__init__.py
+bvbscraper/bvb/base.py
+bvbscraper/bvb/company.py
+bvbscraper/bvb/scraper_service.py
+bvbscraper/bvb/share.py
+bvbscraper/bvb/utils/__init__.py
+bvbscraper/bvb/utils/share_utils.py
