@@ -5,10 +5,11 @@ from bs4 import BeautifulSoup
 import datetime
 import dateutil.relativedelta as relativedelta
 import re
+import pandas as pd
 
 
 class ScraperService:
-    # _TIMEZONE = pytz.timezone('Europe/Bucharest')
+    _TIMEZONE = datetime.timezone.utc
     _ALL_VALUES = ['', 'ALL']
     _HISTORY_INTERVALS = {
         "1MIN": {'dt': 'INTRA', 'p': 'intraday_1'},
@@ -456,7 +457,7 @@ class ScraperService:
 
     # PUBLIC FUNCTIONS #
     def get_all_shares(self, market: str or list = 'all', tier: str or list = 'all',
-                       detailed_company_info: bool = True, issue_info: bool = True,):
+                       detailed_company_info: bool = True, issue_info: bool = True, ):
         """
         Gets all shares from BVB that are traded in the specified market and tier
         :param issue_info:
@@ -519,13 +520,14 @@ class ScraperService:
 
         return share
 
-    def get_history(self, share: Share, period: str = None, start_date: datetime or str = None,
+    def get_history(self, share: Share or list, period: str = None, start_date: datetime or str = None,
                     end_date: datetime or str = None, interval: str = '1D',
-                    adjusted: bool = True):
+                    adjusted: bool = True, format: str = 'json'):
         """
         Gets open, close, highest and lowest price and volume for the specific share.
         Period or start_date and end_date must be provided.
         If all three are provided, start date and end date
+        :param format: json or dataframe
         :param share: a Share object that's history should be downloaded
         :type: bvb.share.Share
         :param period: Valid periods:
@@ -535,6 +537,7 @@ class ScraperService:
         :param adjusted: True to return adjusted prices, False for unadjusted. Defaults True.
         :return: pandas.DataFrame with date, open, close, high, low, volume columns. ##TODO: revise
         """
+
         if not isinstance(share, Share):
             raise TypeError("Provided share is not type of Share.")
 
@@ -556,7 +559,7 @@ class ScraperService:
 
             if type(end_date) == str:
                 if end_date.upper() == "NOW":
-                    end_date = datetime.datetime.today()
+                    end_date = datetime.datetime.now(tz=self._TIMEZONE)
                 else:
                     try:
                         end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
@@ -575,14 +578,14 @@ class ScraperService:
             if period not in self._HISTORY_PERIODS:
                 raise ValueError("Invalid period.")
 
-            end_date = datetime.datetime.today()
+            end_date = datetime.datetime.now(tz=self._TIMEZONE)
 
             if period == 'YTD':
                 start_date = end_date.replace(month=1, day=1)
 
             elif period == 'MAX':
                 if share.start_trading_date:
-                    start_date = share.start_trading_date # FIXME: see if -1 is needed or not
+                    start_date = share.start_trading_date  # FIXME: see if -1 is needed or not
                 else:
                     start_date = self._MIN_START_DATE  # FIXME: see what the api does when min < min_trading_date
 
@@ -595,11 +598,10 @@ class ScraperService:
         if type(adjusted) != bool:
             raise TypeError("Parameter adjusted must be of type bool.")
 
-
         print("start date: ", start_date)
         print("end date: ", end_date)
 
-        start_timestamp = int(datetime.datetime.timestamp(start_date)) # FIXME: int() is ok w 1m interval?
+        start_timestamp = int(datetime.datetime.timestamp(start_date))  # FIXME: int() is ok w 1m interval?
         end_timestamp = int(datetime.datetime.timestamp(end_date))
         dt = self._HISTORY_INTERVALS[interval]['dt']
         p = self._HISTORY_INTERVALS[interval]['p']
@@ -616,13 +618,20 @@ class ScraperService:
                           "end": end_timestamp})
 
         url = f'https://wapi.bvb.ro/api/history?symbol={share.symbol}&' \
-                                               f'dt={dt}&' \
-                                               f'p={p}&' \
-                                               f'ajust={adjusted}&' \
-                                               f'from={start_timestamp}&' \
-                                               f'to={end_timestamp}'
+              f'dt={dt}&' \
+              f'p={p}&' \
+              f'ajust={adjusted}&' \
+              f'from={start_timestamp}&' \
+              f'to={end_timestamp}'
         headers = {"Referer": "https://bvb.ro/"}
 
-        resp = utils.get_url_response(url=url, headers=headers)
+        share_history = utils.get_url_response(url=url, headers=headers).json()
 
-        return resp.json()
+        if format == 'json':
+            return share_history
+        elif format == 'dataframe':
+            df = pd.DataFrame(share_history) \
+                .rename(columns={"t": "date", "o": "open", "h": "high", "l": "low", "c": "closing", "v": "volume"})
+            df.date = df.date.map(lambda timestamp: datetime.datetime.fromtimestamp(timestamp, tz=self._TIMEZONE))
+            return df.set_index("date") \
+                .drop(columns=["s"])
