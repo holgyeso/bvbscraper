@@ -1,7 +1,7 @@
 import re
 from typing import Any
 
-from bvb.base import BaseEntity
+from bvbscraper.bvb.base import BaseEntity
 
 
 class Company(BaseEntity):

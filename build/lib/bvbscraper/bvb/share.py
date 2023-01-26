@@ -1,8 +1,7 @@
 import datetime
 from typing import Any
-
-import bvb.company
-from bvb.base import BaseEntity
+from bvbscraper.bvb.company import Company
+from bvbscraper.bvb.base import BaseEntity
 import re
 
 
@@ -85,7 +84,7 @@ class Share(BaseEntity):
     @company.setter
     def company(self, company):
         if company:
-            if isinstance(company, bvb.company.Company):
+            if isinstance(company, Company):
                 self.__company = company
             else:
                 raise TypeError("Company attribute must be of type bvb.company.Company class")

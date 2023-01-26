@@ -1,6 +1,6 @@
-from bvb.share import Share
-from bvb.company import Company
-from bvb.utils import share_utils as utils
+from bvbscraper.bvb.share import Share
+from bvbscraper.bvb.company import Company
+from bvbscraper.bvb.utils import share_utils as utils
 from bs4 import BeautifulSoup
 import datetime
 import dateutil.relativedelta as relativedelta
