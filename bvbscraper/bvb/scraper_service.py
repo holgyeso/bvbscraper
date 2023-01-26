@@ -24,7 +24,6 @@ class ScraperService:
     _HISTORY_PERIODS = {
         "1D": datetime.timedelta(days=1),
         "5D": datetime.timedelta(days=5),
-        "1W": relativedelta.relativedelta(weeks=1),
         "2W": relativedelta.relativedelta(weeks=2),
         "1M": relativedelta.relativedelta(months=1),
         "3M": relativedelta.relativedelta(months=3),
@@ -45,9 +44,9 @@ class ScraperService:
             - if the value symbolizes all possible values, then all possible values will be returned
             - if `value` is a valid possible value, the list representation of this will be returned
             - if `value` is a list and all it's elements are valid, `value` will be returned
-        :param possible_values: all valid values that the `value` parameter can have (besides _ALL_VALUES)
+        :param possible_values: all valid values that the `value` parameter can have (besides '', 'ALL')
         :type possible_values: list
-        :param value: the value that must be checked and normalized
+        :param value: the value that must be validated and normalized
         :type value: str or list
         :return: normalized value as list, containing only valid values written with uppercase
         :rtype: list
@@ -457,15 +456,30 @@ class ScraperService:
 
     # PUBLIC FUNCTIONS #
     def get_all_shares(self, market: str or list = 'all', tier: str or list = 'all',
-                       detailed_company_info: bool = True, issue_info: bool = True, ):
+                       detailed_company_info: bool = True, issue_info: bool = True):
         """
-        Gets all shares from BVB that are traded in the specified market and tier
-        :param issue_info:
-        :param detailed_company_info:
-        :param market: the abbreviation of a BVB market or '' or 'all' representing all markets.
-        :type: str or list
-        :param tier: the abbreviation of a BVB market tier or '' or 'all' representing all market tiers.
-        :return: an array that contains Share instances that match the market and tier criteria
+        Gets all shares from BVB that are traded in the specified market and tier, with the following information:
+            * symbol
+            * isin
+            * name
+            * total_shares
+            * face_value
+            * market
+            * tier
+            * company:
+                * name
+                * fiscal_code
+                * nace_code
+                * district
+                * country_iso2
+                * industry
+                * sector
+        :param market: the abbreviation of BVB market(s) or '' or 'all' representing all markets.
+        :param tier: the abbreviation of BVB market tier(s) or '' or 'all' representing all market tiers.
+        :param detailed_company_info: if True then further information will be returned about a share:
+        commerce_registry_code, address, website, email, activity field, description, shareholders. Defaults to True.
+        :param issue_info: if True, the start date of trading will be returned as well
+        :return: an array that contain Share instances that match the market and tier criteria
 
         .. note::
         market abbreviations:
@@ -494,6 +508,30 @@ class ScraperService:
     def get_share_info(self, symbol: str or list = None,
                        detailed_company_info: bool = True, issue_info: bool = True,
                        share: Share or list = None):
+        """
+        Gets information of a share about:
+            * symbol
+            * isin
+            * name
+            * total_shares
+            * face_value
+            * market
+            * tier
+            * company:
+                * name
+                * fiscal_code
+                * nace_code
+                * district
+                * country_iso2
+                * industry
+                * sector
+        :param symbol: the BVB ticker of the share about that information must be retrieved
+        :param detailed_company_info: if True then further information will be returned about a share:
+        commerce_registry_code, address, website, email, activity field, description, shareholders. Defaults to True.
+        :param issue_info: if True, the start date of trading will be returned as well
+        :param share: the share can be specified as a bvbscraper.share.Share object too
+        :return: a Share object or a list of Shares with the specified information according to the parameters
+        """
         if share is None and symbol is None:
             raise ValueError("One of share and symbol parameters must be given.")
 
@@ -520,17 +558,18 @@ class ScraperService:
 
         return share
 
-    def get_history(self, share: Share or list, period: str = None, start_date: datetime or str = None,
+    def get_history(self, share: Share or list, period: str = "1m", start_date: datetime or str = None,
                     end_date: datetime or str = None, interval: str = '1D',
                     adjusted: bool = True, format: str = 'json'):
         """
         Gets open, close, highest and lowest price and volume for the specific share.
         Period or start_date and end_date must be provided.
-        If all three are provided, start date and end date
+        If all three are provided, start date and end date will be considered.
+
         :param format: json or dataframe
         :param share: a Share object that's history should be downloaded
         :type: bvb.share.Share
-        :param period: Valid periods:
+        :param period: Valid periods: 1d, 5d, 2w, 1m, 3m, 6m, 1y, 2y, 5y, 10y, ytd, max
         :param start_date: download start date string (YYYY-MM-DD) or datetime.datetime object.
         :param end_date: download end date string (YYYY-MM-DD), "now" or datetime.datetime object.
         :param interval: frequency of data. Valid intervals: 1min, 5min, 15min, 30min, 1h, 1D, 1W, 1M. Defaults to 1 day (1D).
