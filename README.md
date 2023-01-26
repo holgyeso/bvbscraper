@@ -5,7 +5,7 @@ Python module with the scope to scrape information about securities listed on th
 ## How to get it to work
 1. `git clone` this repo from command line
 2. enter the cloned repo with `cd bvbscraper` command
-3. install the wheel with `pip` by referencing the path to the `.whl` file. For example `pip install https://github.com/holgyeso/bvbscraper.git`
+3. install the wheel with `pip` by referencing the path to the `.whl` file. For example `pip install https://github.com/holgyeso/bvbscraper`
 4. On successful installation, the wheel can be imported in Python with `import bvbscraper`
 
 ## What the library offers
