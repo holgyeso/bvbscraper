@@ -1,30 +1,43 @@
 import re
 from typing import Any
 
-from bvbscraper.bvb.base import BaseEntity
-
+# from bvbscraper.bvb.base import BaseEntity
+from base import BaseEntity
 
 class Company(BaseEntity):
     __name = None
 
-    def __init__(self, name, fiscal_code, params: dict = None, **kwargs):
+    def __init__(self, name, 
+                 fiscal_code, 
+                 caen_code=None,
+                 district=None, 
+                 country_iso2=None, 
+                 sector=None,
+                 industry=None,
+                 commerce_registry_code=None,
+                 address = None,
+                 website=None,
+                 email=None,
+                 activity_field=None,
+                 description=None,
+                 shareholders=None
+                 ):
         super().__init__()
         self.name = name
         self.fiscal_code = fiscal_code
-        if params is not None:
-            kwargs = params | kwargs
-        self.nace_code = kwargs.get("nace_code")
-        self.district = kwargs.get("district")
-        self.country_iso2 = kwargs.get("country_iso2")
-        self.sector = kwargs.get("sector")
-        self.industry = kwargs.get("industry")
-        self.commerce_registry_code = kwargs.get("commerce_registry_code")
-        self.address = kwargs.get("address")
-        self.website = kwargs.get("website")
-        self.email = kwargs.get("email")
-        self.activity_field = kwargs.get("activity_field")
-        self.description = kwargs.get("description")
-        self.shareholders = kwargs.get("shareholders")
+        self.caen_code = caen_code
+        self.district = district
+        self.country_iso2 = country_iso2
+
+        self.sector = sector
+        self.industry = industry
+        self.commerce_registry_code = commerce_registry_code
+        self.address = address
+        self.website = website
+        self.email = email
+        self.activity_field = activity_field
+        self.description = description
+        self.shareholders = shareholders
 
     @property
     def name(self):
@@ -34,7 +47,7 @@ class Company(BaseEntity):
     def name(self, name):
         if name:
             if type(name) != str:
-                raise TypeError("Company name should be of type str.")
+                raise TypeError(f"Company name ({name}) should be of type str.")
             self.__name = name
         else:
             raise ValueError("Company name must be given.")
@@ -47,7 +60,7 @@ class Company(BaseEntity):
     def fiscal_code(self, fiscal_code):
         if fiscal_code:
             if type(fiscal_code) != str and type(fiscal_code) != int:
-                raise TypeError("Company's fiscal code can contain only characters and numbers.")
+                raise ValueError(f"Company's fiscal code ({fiscal_code}) can contain only characters and numbers.")
             if len(str(fiscal_code).strip()) == 0:
                 raise ValueError("Fiscal code cannot be empty.")
             self.__fiscal_code = fiscal_code
@@ -55,21 +68,25 @@ class Company(BaseEntity):
             raise ValueError("Fiscal code must be given")
 
     @property
-    def nace_code(self):
-        if "_Company__nace_code" in vars(self):
-            return self.__nace_code
+    def caen_code(self):
+        if "_Company__caen_code" in vars(self):
+            return self.__caen_code
         return None
 
-    @nace_code.setter
-    def nace_code(self, nace_code):
-        if nace_code:
-            nace_code = nace_code.replace("-", "").strip()
+    @caen_code.setter
+    def caen_code(self, caen_code):
+        if caen_code:
+            caen_code = caen_code.replace("-", "").strip()
 
-            if type(nace_code) == int:
-                nace_code = str(nace_code)
+            if type(caen_code) == int:
+                caen_code = str(caen_code)
 
-            if re.findall(r"^[0-9]{4}$", nace_code):
-                self.__nace_code = nace_code
+            if re.findall(r"^[0-9]{4}$", caen_code):
+                self.__caen_code = caen_code
+            else:
+                raise ValueError(f"CAEN code ({caen_code}) must contain 4 numeric characters.")
+        
+        raise ValueError("CAEN code must be given")
 
     @property
     def district(self):
@@ -94,12 +111,12 @@ class Company(BaseEntity):
     def country_iso2(self, country_iso2):
         if country_iso2:
             if type(country_iso2) != str:
-                raise TypeError("Country's ISO 2 code must be of type str.")
+                raise TypeError(f"Country's ISO 2 code must be of type str. {country_iso2} doesn't match this pattern.")
             country_iso2 = country_iso2.upper().strip()
             if re.findall(r"^[A-Z]{2}$", country_iso2):
                 self.__country_iso2 = country_iso2
             else:
-                raise ValueError("Country's ISO 2 code must contain exactly two alpha characters.")
+                raise ValueError(f"Country's ISO 2 code must contain exactly two alpha characters. {country_iso2} doesn't match this pattern.")
 
     @property
     def sector(self):
@@ -143,6 +160,8 @@ class Company(BaseEntity):
 
             if re.findall(r"^[JCF][0-9]{2}/[0-9]+/[0-9]{4}", reg_code):
                 self.__commerce_registry_code = reg_code
+            else:
+                raise ValueError(f"Commerce Registry Code ({reg_code}) doesn't match the pattern.")
 
     @property
     def address(self):
@@ -233,7 +252,7 @@ class Company(BaseEntity):
             "headquarters": self.address,
             "district": self.district,
             "country_iso2": self.country_iso2,
-            "nace_code": self.nace_code,
+            "caen_code": self.caen_code,
             "sector": self.sector,
             "industry": self.industry,
             "activity_field": self.activity_field,

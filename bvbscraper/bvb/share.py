@@ -1,29 +1,39 @@
 import datetime
 from typing import Any
-from bvbscraper.bvb.company import Company
-from bvbscraper.bvb.base import BaseEntity
+# from bvbscraper.bvb.company import Company
+# from bvbscraper.bvb.base import BaseEntity
+from company import Company
+from base import BaseEntity
 import re
 
 
 class Share(BaseEntity):
     __symbol = None
-    __specs = {}  #
 
-    def __init__(self, symbol: str, params: dict = None, **kwargs):
+    def __init__(self, 
+                 symbol,
+                 isin,
+                 name,
+                 company,
+                 total_shares,
+                 face_value,
+                 market,
+                 tier,
+                 start_trading_date=None,
+                 segment=None
+                 ):
         super().__init__()
         self.symbol = symbol
-        if params is not None:
-            # order of merge is important, since explicitly given parameters will be considered in case the params and
-            # kwargs both contain the same key
-            kwargs = params | kwargs
-        self.isin = kwargs.get("isin")
-        self.name = kwargs.get("name")
-        self.company = kwargs.get("company")
-        self.total_shares = kwargs.get("total_shares")
-        self.face_value = kwargs.get("face_value")
-        self.market = kwargs.get("market")
-        self.tier = kwargs.get("tier")
-        self.start_trading_date = kwargs.get("start_trading_date")
+        self.isin = isin
+        self.name = name
+        self.company = company
+        self.total_shares = total_shares
+        self.face_value = face_value
+        self.segment = segment
+        self.market = market
+        self.tier = tier
+        self.start_trading_date = start_trading_date
+
 
     @property
     def symbol(self):
@@ -40,7 +50,7 @@ class Share(BaseEntity):
                 if re.findall("^[a-zA-Z0-9]+$", symbol):
                     self.__symbol = symbol.upper()
                 else:
-                    raise ValueError("Share instance cannot be initialized with invalid string")
+                    raise ValueError(f"Share instance cannot be initialized with invalid string: '{symbol}'")
         else:
             raise ValueError("Symbol must be given")
 
@@ -58,7 +68,7 @@ class Share(BaseEntity):
                 if re.findall(isin_pattern, isin):
                     self.__isin = isin
                 else:
-                    raise ValueError("Invalid ISIN code.")
+                    raise ValueError(f"Invalid ISIN code: '{isin}'.")
             else:
                 raise TypeError("ISIN must be of type str.")
 
@@ -101,10 +111,10 @@ class Share(BaseEntity):
             try:
                 total_shares = int(total_shares)
             except ValueError:
-                raise TypeError("Total shares must be integer or convertable to that.")
+                raise TypeError(f"Total shares ({total_shares}) must be integer or convertable to that.")
 
             if total_shares <= 0:
-                raise ValueError("Total shares must be a non-null positive integer")
+                raise ValueError(f"Total shares ({total_shares}) must be a non-null positive integer")
 
             self.__total_shares = total_shares
 
@@ -119,13 +129,28 @@ class Share(BaseEntity):
         if face_value:
             if type(face_value) == str:
                 face_value = face_value.replace("-", "").strip()
+                face_value = face_value.replace(",", ".")
                 if face_value:
                     try:
                         face_value = float(face_value)
                     except ValueError:
-                        raise TypeError("Face value cannot be string")
+                        raise TypeError(f"Face value ({face_value}) cannot be string")
             if type(face_value) == int or type(face_value) == float:
                 self.__face_value = face_value
+
+    @property
+    def segment(self):
+        if '_Share__segment' in vars(self):
+            return self.__segment
+        return None
+
+    @segment.setter
+    def segment(self, segment):
+        if segment:
+            if segment in ['BSE', 'BER', 'ATS']:
+                self.__segment = segment
+            else:
+                raise ValueError(f"Invalid segment abbreviation: {segment}.")
 
     @property
     def market(self):
@@ -138,8 +163,10 @@ class Share(BaseEntity):
         if market:
             if market in ['REGS', 'XRS1', 'XRSI']:
                 self.__market = market
+            elif market == '-':
+                self.__market = None
             else:
-                raise ValueError("Invalid market abbreviation.")
+                raise ValueError(f"Invalid market abbreviation: '{market}'.")
 
     @property
     def tier(self):
@@ -155,11 +182,20 @@ class Share(BaseEntity):
 
             tier = tier.upper()
 
-            valid_tiers = ["INT'L", "PREMIUM", "STANDARD", "AERO PREMIUM", "AERO STANDARD", "AERO BASE", "INTL-MTS"]
+            tier_ro_en_mappings = {
+                "INTL-SMT": "INTL-MTS",
+                "AERO BAZA": "AERO BASE"
+            }
+
+            tier = tier_ro_en_mappings[tier] if tier in tier_ro_en_mappings else tier
+
+            valid_tiers = ["INT'L", "PREMIUM", "STANDARD", "AERO PREMIUM", "AERO STANDARD", "AERO BASE", "INTL-MTS", "III-R"]
             if tier in valid_tiers:
                 self.__tier = tier
+            elif tier == '-':
+                self.__tier = None
             else:
-                raise ValueError("Invalid tier abbreviation.")
+                raise ValueError(f"Invalid tier abbreviation: {tier}.")
 
     @property
     def info(self):
@@ -191,7 +227,7 @@ class Share(BaseEntity):
                 try:
                     start_date = datetime.datetime.strptime(start_date, "%m/%d/%Y")
                 except ValueError:
-                    raise ValueError("Start date cannot be converted to datetime.datetime")
+                    raise ValueError(f"Start date ({start_date}) cannot be converted to datetime.datetime")
 
             if type(start_date) == datetime.datetime:
                 self.__start_trading_date = start_date
