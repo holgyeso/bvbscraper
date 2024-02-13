@@ -72,9 +72,6 @@ def post_response_instrument_details_form(symbol: str, button: str, form_id: str
     """
     _BASE_URL = "https://www.bvb.ro/FinancialInstruments/Details/FinancialInstrumentsDetails.aspx?s="
 
-    possible_buttons = ['OVERVIEW', 'TRADING', 'CHARTS', 'NEWS', 'FINANCIALS', 'ISSUER PROFILE']
-    default_button = 'OVERVIEW'  # when the page loads, the default_button is selected.
-
     url = _BASE_URL + symbol
 
     # validate symbol
@@ -92,14 +89,8 @@ def post_response_instrument_details_form(symbol: str, button: str, form_id: str
 
     button = button.upper()
 
-    if button not in possible_buttons:
-        raise ValueError("Invalid button.")
-
     # retrieve the default page with GET
     get_response = get_url_response(url=url).content
-
-    if default_button == 'Overview':
-        return get_response
 
     # initialize a BeautifulSoup4 instance on the base site, got with GET request.
     soup = BeautifulSoup(get_response, 'html.parser')

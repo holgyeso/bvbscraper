@@ -76,17 +76,15 @@ class Company(BaseEntity):
     @caen_code.setter
     def caen_code(self, caen_code):
         if caen_code:
-            caen_code = caen_code.replace("-", "").strip()
 
             if type(caen_code) == int:
                 caen_code = str(caen_code)
 
-            if re.findall(r"^[0-9]{4}$", caen_code):
-                self.__caen_code = caen_code
-            else:
-                raise ValueError(f"CAEN code ({caen_code}) must contain 4 numeric characters.")
-        
-        raise ValueError("CAEN code must be given")
+            caen_code = caen_code.replace("-", "").strip()
+            if caen_code:
+
+                if re.findall(r"^[0-9]{4}$", caen_code):
+                    self.__caen_code = caen_code
 
     @property
     def district(self):
@@ -158,10 +156,8 @@ class Company(BaseEntity):
 
             reg_code = reg_code.upper()
 
-            if re.findall(r"^[JCF][0-9]{2}/[0-9]+/[0-9]{4}", reg_code):
+            if re.findall(r"^[JCF][0-9]{2}\/[0-9]+\/{0,1}[0-9]*\/[0-9]{4}", reg_code):
                 self.__commerce_registry_code = reg_code
-            else:
-                raise ValueError(f"Commerce Registry Code ({reg_code}) doesn't match the pattern.")
 
     @property
     def address(self):

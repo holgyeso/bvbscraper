@@ -1,6 +1,7 @@
 # from bvbscraper.bvb.share import Share
 # from bvbscraper.bvb.company import Company
 # from bvbscraper.bvb.utils import share_utils as utils
+import time
 from share import Share
 from company import Company
 from utils import share_utils as utils
@@ -263,108 +264,89 @@ class ScraperService:
 
     #     return return_values
 
-    # def __get_symbol_info_wapi(self, share: Share):
-    #     """
-    #     Calls the symbol wapi of BVB and scrapes the industry and sector company attributes.
-    #     :param share: a Share object for that information will be retrieved
-    #     :type: bvb.share.Share
-    #     :return: a new Share object that has sector and industry information added
-    #     :rtype: list of Share objects
-    #     """
-    #     _URL = "https://wapi.bvb.ro/api/symbols?symbol=" + share.symbol
-    #     _REQUEST_HEADERS = {'Referer': 'https://www.bvb.ro/'}
-    #     data = utils.get_url_response(_URL, _REQUEST_HEADERS).json()  # api returns a json
-
-    #     # data regarding company -> industry and sector
-    #     share.company.sector = data["sector"]
-    #     share.company.industry = data["industry"]
-
-    #     # TODO: explore if anything else is needed from this dict
-
-    #     return share
 
     # def __get_detailed_company_info(self, share: Share):
     #     """
     #     Gets the following information from the "Issuer profile" section of the page of a share on BVB.
     #     The information will be inserted in the Share's company attribute of type bvb.company.Company.
-    #         * commerce_registry_code
-    #         * address
-    #         * website
-    #         * email
-    #         * activity field
-    #         * description
-    #         * shareholders
+            # * commerce_registry_code
+            # * address
+            # * website
+            # * email
+            # * activity field
+            # * description
+            # * shareholders
     #     :param share: the share object that's company fields will be completed.
     #     :type: bvb.share.Share
     #     :return: the new Share object with the fields that were retrieved from BVB
     #     :rtype: list of Shares.
     #     """
 
-    #     _COMPANY_INFO_BUTTON = "Issuer profile"
+        # _COMPANY_INFO_BUTTON = "Issuer profile"
 
-    #     html = utils.post_response_instrument_details_form(
-    #         symbol=share.symbol,
-    #         button=_COMPANY_INFO_BUTTON,
-    #         form_id="aspnetForm"
-    #     )
+        # html = utils.post_response_instrument_details_form(
+        #     symbol=share.symbol,
+        #     button=_COMPANY_INFO_BUTTON,
+        #     form_id="aspnetForm"
+        # )
 
-    #     soup = BeautifulSoup(html, 'html.parser')
+        # soup = BeautifulSoup(html, 'html.parser')
 
-    #     company_info = {}
+        # company_info = {}
 
-    #     # issuer profile
-    #     profile_table = soup.find("table", {"id": "ctl00_body_ctl02_CompanyProfile_dvIssProfile"})
+        # # issuer profile
+        # profile_table = soup.find("table", {"id": "ctl00_body_ctl02_CompanyProfile_dvIssProfile"})
 
-    #     _NEEDED_PROFILE_INFO = {
-    #         'Commerce Registry Code': 'commerce_registry_code',
-    #         'Address': 'address',
-    #         'Website': 'website',
-    #         'E-mail': 'email',
-    #         'Field of activity': 'activity_field'
-    #     }
+        # _NEEDED_PROFILE_INFO = {
+        #     'Commerce Registry Code': 'commerce_registry_code',
+        #     'Address': 'address',
+        #     'Website': 'website',
+        #     'E-mail': 'email',
+        #     'Field of activity': 'activity_field'
+        # }
 
-    #     for tr in profile_table.find_all('tr'):
-    #         tds = tr.find_all('td')
-    #         if len(tds) != 2:
-    #             raise ValueError("A tr element does not have exactly two td elements in company profile")
+        # for tr in profile_table.find_all('tr'):
+        #     tds = tr.find_all('td')
+        #     if len(tds) != 2:
+        #         raise ValueError("A tr element does not have exactly two td elements in company profile")
 
-    #         key = tds[0].text
-    #         if key in _NEEDED_PROFILE_INFO:
-    #             if key == "Website":
-    #                 val = tds[1].find("a")['href']
-    #             else:
-    #                 val = tds[1].text.replace("\r\n", "").strip()
-    #             company_info[_NEEDED_PROFILE_INFO[key]] = val
+        #     key = tds[0].text
+        #     if key in _NEEDED_PROFILE_INFO:
+        #         if key == "Website":
+        #             val = tds[1].find("a")['href']
+        #         else:
+        #             val = tds[1].text.replace("\r\n", "").strip()
+        #         company_info[_NEEDED_PROFILE_INFO[key]] = val
 
-    #     # issuer description
-    #     description_div = soup.find("div", {"id": "ctl00_body_ctl02_CompanyProfile_CDescription"})
-    #     if description_div:
-    #         description_span = description_div.find_all("span", {"lang": "EN-US"})
-    #         desc_text = ""
-    #         for span in description_span:
-    #             desc_text += span.text
+        # # issuer description
+        # description_div = soup.find("div", {"id": "ctl00_body_ctl02_CompanyProfile_CDescription"})
+        # if description_div:
+        #     description_span = description_div.find_all("span", {"lang": "EN-US"})
+        #     desc_text = ""
+        #     for span in description_span:
+        #         desc_text += span.text
 
-    #         company_info["description"] = desc_text
+        #     company_info["description"] = desc_text
 
-    #     # shareholders
-    #     shareholders = soup.find("table", {"id": "gvDetails"})
-    #     if shareholders:
-    #         shareholder_list = []
-    #         trs = shareholders.find_all("tr")
-    #         headers = [th.text for th in trs[0].find_all("th")]
-    #         for tr in trs[1:-1]:
-    #             shareholder_dict = {}
-    #             tds = tr.find_all("td")
-    #             for h in range(0, len(headers)):
-    #                 shareholder_dict[headers[h]] = tds[h].text
-    #             shareholder_list.append(shareholder_dict)
+        # # shareholders
+        # shareholders = soup.find("table", {"id": "gvDetails"})
+        # if shareholders:
+        #     shareholder_list = []
+        #     trs = shareholders.find_all("tr")
+        #     headers = [th.text for th in trs[0].find_all("th")]
+        #     for tr in trs[1:-1]:
+        #         shareholder_dict = {}
+        #         tds = tr.find_all("td")
+        #         for h in range(0, len(headers)):
+        #             shareholder_dict[headers[h]] = tds[h].text
+        #         shareholder_list.append(shareholder_dict)
 
-    #         company_info["shareholders"] = shareholder_list
+        #     company_info["shareholders"] = shareholder_list
 
-    #     for i in company_info:
-    #         share.company.__setattr__(i, company_info[i])
+        # for i in company_info:
+        #     share.company.__setattr__(i, company_info[i])
 
-    #     return share
+        # return share
 
     # def __get_issue_info(self, share: Share):
     #     """
@@ -785,6 +767,23 @@ def __validate_SharesListForDownload_header(current_header_list: list):
         if expected_header not in current_header_list:
             raise KeyError(f'[Header list validation] Expected column "{expected_header}" not found among actual header columns')
 
+def __get_sector_and_industry(symbol:str) -> set:
+    """Calls the symbol wapi of BVB and scrapes the industry and sector company attributes.
+
+    Args:
+        symbol (str): The symbol of a valid share on BVB
+
+    Returns:
+        set: first item is the sector and the second one the industry.
+    """
+    _BASE_URL = "https://wapi.bvb.ro/api/symbols?symbol="
+    _REQUEST_HEADERS = {'Referer': 'https://www.bvb.ro/'}
+
+    share_data = utils.get_url_response(_BASE_URL + symbol, _REQUEST_HEADERS).json()
+
+    return (share_data["sector"], share_data["industry"])
+
+
 def get_all_shares():
     _URL = "https://www.bvb.ro/FinancialInstruments/Markets/SharesListForDownload.ashx"
 
@@ -827,13 +826,18 @@ def get_all_shares():
 
             response_line_list = response_line.split(";")
 
+            # get sector and industry
+            sector, industry = __get_sector_and_industry(response_line_list[symbol_headers_index["Symbol"]])
+
             # create the Company object
             company = Company(
                 name=response_line_list[company_headers_index["Issuer"]], 
                 fiscal_code=response_line_list[company_headers_index["Fiscal / Unique Code"]],
                 caen_code=response_line_list[company_headers_index["CAEN Code"]],
                 district=response_line_list[company_headers_index["District"]],
-                country_iso2=response_line_list[company_headers_index["Country"]]
+                country_iso2=response_line_list[company_headers_index["Country"]],
+                sector=sector,
+                industry=industry
             )
 
             # create the Share object
@@ -849,7 +853,94 @@ def get_all_shares():
                 tier=response_line_list[symbol_headers_index["Tier"]],
             )
         except Exception as e:
-            raise Exception(f"[Exception at {response_line_list[0]}] ")
+            raise Exception(f"[Exception at line beginning with '{response_line_list[0]}'] ")
         share_list.append(share)
 
     return share_list
+
+
+def __get_company_info(symbol:str) -> dict:
+    """Gets the following information from the "Issuer profile" ("Emitent") section of the page of a share on BVB"
+            * commerce_registry_code
+            * address
+            * website
+            * email
+            * activity field
+            * description
+            * shareholders
+    Args:
+        symbol (str): The symbol of a valid share on BVB
+
+    Returns:
+        dict: containing the above information. The keys correspond to the list above.
+    """
+    _COMPANY_INFO_BUTTON = "Emitent"
+
+    # get data from the Issuer profile tab
+    html = utils.post_response_instrument_details_form(
+        symbol=symbol,
+        button=_COMPANY_INFO_BUTTON,
+        form_id="aspnetForm"
+    )
+
+    # create a soup object on it
+    soup = BeautifulSoup(html, 'html.parser')
+
+    company_info = {}
+
+    # issuer profile
+    profile_table = soup.find("table", {"id": "ctl00_body_ctl02_CompanyProfile_dvIssProfile"})
+
+    _NEEDED_PROFILE_INFO = {
+        'Cod Registrul Comertului': 'commerce_registry_code',
+        'Adresa': 'address',
+        'Website': 'website',
+        'E-mail': 'email',
+        'Domeniu de activitate': 'activity_field'
+    }
+
+    for tr in profile_table.find_all('tr'):
+        tds = tr.find_all('td')
+        if len(tds) != 2:
+            raise ValueError("A tr element does not have exactly two td elements in company profile")
+
+        key = tds[0].text
+        if key in _NEEDED_PROFILE_INFO:
+            if key == "Website":
+                val = tds[1].find("a")['href']
+            else:
+                val = tds[1].text.replace("\r\n", "").strip()
+            company_info[_NEEDED_PROFILE_INFO[key]] = val
+
+    # issuer description
+    description_div = soup.find("div", {"id": "ctl00_body_ctl02_CompanyProfile_CDescription"})
+    if description_div:
+        description_span = description_div.find_all("span", {"lang": "EN-US"})
+        desc_text = ""
+        for span in description_span:
+            desc_text += span.text
+
+        company_info["description"] = desc_text
+
+    # shareholders
+    shareholders = soup.find("table", {"id": "gvDetails"})
+    if shareholders:
+        shareholder_list = []
+        trs = shareholders.find_all("tr")
+        headers = [th.text for th in trs[0].find_all("th")]
+        for tr in trs[1:-1]:
+            shareholder_dict = {}
+            tds = tr.find_all("td")
+            for h in range(0, len(headers)):
+                shareholder_dict[headers[h]] = tds[h].text
+            shareholder_list.append(shareholder_dict)
+
+        company_info["shareholders"] = shareholder_list
+
+    return company_info
+
+
+def get_share_info(symbol: str):
+        
+    # get website, address, etc.
+    return __get_company_info(symbol=symbol)

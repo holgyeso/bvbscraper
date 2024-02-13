@@ -208,10 +208,11 @@ class Share(BaseEntity):
                     'share_name': self.name,
                     'total_shares': self.total_shares,
                     'face_value': self.face_value,
+                    'segment': self.segment,
                     'market': self.market,
                     'tier': self.tier,
                     'company': company,
-                    'start_trading_date': self.start_trading_date
+                    'start_trading_date': self.start_trading_date,
                 }
 
     @property
