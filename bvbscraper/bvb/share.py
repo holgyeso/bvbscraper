@@ -1,9 +1,6 @@
-import datetime
 from typing import Any
-# from bvbscraper.bvb.company import Company
-# from bvbscraper.bvb.base import BaseEntity
-from company import Company
-from base import BaseEntity
+from bvb.company import Company
+from bvb.base import BaseEntity
 import re
 
 
@@ -19,7 +16,6 @@ class Share(BaseEntity):
                  face_value,
                  market,
                  tier,
-                 start_trading_date=None,
                  segment=None
                  ):
         super().__init__()
@@ -32,7 +28,6 @@ class Share(BaseEntity):
         self.segment = segment
         self.market = market
         self.tier = tier
-        self.start_trading_date = start_trading_date
 
 
     @property
@@ -211,27 +206,9 @@ class Share(BaseEntity):
                     'segment': self.segment,
                     'market': self.market,
                     'tier': self.tier,
-                    'company': company,
                     'start_trading_date': self.start_trading_date,
+                    'company': company,
                 }
-
-    @property
-    def start_trading_date(self):
-        if '_Share__start_trading_date' in vars(self):
-            return self.__start_trading_date
-        return None
-
-    @start_trading_date.setter
-    def start_trading_date(self, start_date):
-        if start_date:
-            if type(start_date) == str:
-                try:
-                    start_date = datetime.datetime.strptime(start_date, "%m/%d/%Y")
-                except ValueError:
-                    raise ValueError(f"Start date ({start_date}) cannot be converted to datetime.datetime")
-
-            if type(start_date) == datetime.datetime:
-                self.__start_trading_date = start_date
 
     def __repr__(self):
         return f"BVBScraper.Share object <{self.symbol}>"
