@@ -1,6 +1,6 @@
 from typing import Any
-from bvb.company import Company
-from bvb.base import BaseEntity
+from company import Company
+from base import BaseEntity
 import re
 
 
@@ -16,7 +16,8 @@ class Share(BaseEntity):
                  face_value,
                  market,
                  tier,
-                 segment=None
+                 status,
+                 segment=None,
                  ):
         super().__init__()
         self.symbol = symbol
@@ -28,7 +29,7 @@ class Share(BaseEntity):
         self.segment = segment
         self.market = market
         self.tier = tier
-
+        self.status = status
 
     @property
     def symbol(self):
@@ -191,6 +192,29 @@ class Share(BaseEntity):
                 self.__tier = None
             else:
                 raise ValueError(f"Invalid tier abbreviation: {tier}.")
+    @property
+    def status(self):
+        if '_Share__status' in vars(self):
+            return self.__status
+        return None
+
+    @status.setter
+    def status(self, status):
+        if status:
+            if type(status) != str:
+                raise TypeError("Status must be of type str")
+
+            status = status.upper()
+
+            status_ro_en_mappings = {
+                "TRANZACTIONABILA": "TRADEABLE",
+                "SUSPENDATA": "SUSPENDED"
+            }
+
+            if status in status_ro_en_mappings:
+                self.__status = status_ro_en_mappings[status]
+            else:
+                raise ValueError(f"Invalid Status: {status}.")
 
     @property
     def info(self):
@@ -206,7 +230,7 @@ class Share(BaseEntity):
                     'segment': self.segment,
                     'market': self.market,
                     'tier': self.tier,
-                    'start_trading_date': self.start_trading_date,
+                    'status': self.status,
                     'company': company,
                 }
 
@@ -218,5 +242,3 @@ class Share(BaseEntity):
 
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
-
-

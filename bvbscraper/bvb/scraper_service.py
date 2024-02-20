@@ -1,6 +1,6 @@
-from bvb.share import Share
-from bvb.company import Company
-from bvb.utils import share_utils as utils
+from share import Share
+from company import Company
+from utils import share_utils as utils
 import pytz
 import datetime
 import dateutil.relativedelta as relativedelta
@@ -202,6 +202,7 @@ class ScraperService:
             "Exchange segment": header_list.index("Exchange segment"),  # Share.segment
             "Main Market": header_list.index("Main Market"),  # Share.market
             "Tier": header_list.index("Tier"),  # Share.tier
+            "Status": header_list.index("Status"), #Share.status
         }
 
         share_list = []
@@ -242,6 +243,7 @@ class ScraperService:
                         segment=response_line_list[symbol_headers_index["Exchange segment"]],
                         market=response_line_list[symbol_headers_index["Main Market"]],
                         tier=response_line_list[symbol_headers_index["Tier"]],
+                        status=response_line_list[symbol_headers_index["Status"]],
                     )
 
                 except Exception as e:
@@ -251,6 +253,31 @@ class ScraperService:
 
         return share_list
 
+    def get_day_of_last_trade(self, share: str, before_ts = None) -> datetime.datetime.timestamp:
+        """Function to retrieve the last timestamp for that the specific share had trades recorded.
+
+        Args:
+            share (str): The symbol (ticker) of the share
+
+        Returns:
+            datetime.datetime.timestamp: the timestamp of the last trade
+        """
+        if before_ts:
+            lookup_ts = before_ts
+        else:
+            lookup_ts = int(datetime.datetime.timestamp(datetime.datetime.now()))
+
+        url = f"https://wapi.bvb.ro/api/history?symbol={share}&dt=DAILY&p=day&ajust=1&from={lookup_ts}&to={lookup_ts}"
+        header = {"Referer": "https://bvb.ro/"}
+
+        response = utils.get_url_response(url=url, headers=header).json()
+
+        if response['s'] == "no_data":
+            return response["nextTime"]
+        else:
+            return lookup_ts
+        
+    
     def get_trading_history(self, 
                               share: str | Share, 
                               period: str = None, 
@@ -354,6 +381,18 @@ class ScraperService:
         response = utils.get_url_response(url=url, headers=header).json()
 
         if response['s'] != 'ok':
-            raise ValueError(f"Invalid response: {response}")
+            if response['s'] == "no_data":
+                warnings.warn(f"No trading data for {share.symbol} in period between {start_date.date()} and {end_date.date()}.")
+                response = {
+                    't': [],
+                    'o': [],
+                    'h': [],
+                    'l': [],
+                    'c': [],
+                    'v': [],
+                    's': 'ok'
+                }
+            else:
+                raise ValueError(f"Invalid response: {response}")
 
         return response

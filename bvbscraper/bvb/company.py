@@ -1,6 +1,6 @@
 import re
 from typing import Any
-from bvb.base import BaseEntity
+from base import BaseEntity
 
 class Company(BaseEntity):
     __name = None
